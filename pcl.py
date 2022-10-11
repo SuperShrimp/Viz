@@ -9,30 +9,40 @@ pcl = np.load("source_data_22_7_21_1127/pcl_22_7_21_1127.npy")
 box = np.load("source_data_22_7_21_1140/base_det_boxes_22_7_21_1140.npy")
 
 def dele_attr(attri_map, level):
+    '''
+    删掉一部分只留Attr中的一部分，并且data里面的索引可以接到pcl上
+    '''
     max_attr = np.array(attri_map).max()
     min_attr = np.array(attri_map).min()
-    level_attr = min_attr + (max_attr - min_attr)*level
 
+    level_attr = min_attr + (max_attr - min_attr)*level
+    point_list = np.zeros(len(attri_map))
     data = np.zeros(len(attri_map))
     for i in range(len(attri_map)):
         if(attri_map[i] > level_attr):
-           data[i] = attri_map[i]
+           data = np.append(data, attri_map[i])
+           point_list = np.append(point_list, i)
+    print(point_list)
+    return np.array(data), point_list
 
+def new_pointcloud(pcl, pointlist):
+    '''
+    根据attr的结果构造一个新的点云输出
+    '''
 
-    return np.array(data)
-
-def dele_points(pcl, attr_map):
-    #为PCL添加新的一列attr_map
-    #继续施工
-    data = np.column_stack((attr_map, pcl))
-    data[np.all(data!=0, axis=1)]
-    print(data.shape)
-
-    return data
+    new_pts = []
+    for i in range(len(pointlist)):
+        index = pointlist[i]
+        index = np.int(index)
+        new_pts = np.append(new_pts, pcl[index])
+    new_pts = new_pts.reshape(len(pointlist), 4)
+    print(new_pts.shape)
+    return new_pts
 
 def point_crop(pcl, bounding_box):
     '''
     通过bounding_box计算八个边界点，把边界点内的点云剪裁出来
+    自己写的，用处并不是很大
     '''
     print(pcl.shape)
     pcd = open3d.geometry.PointCloud()
@@ -109,8 +119,6 @@ def visualize_attr_map(points, box, attr_map, draw_origin=True):
     attr_map_scaled = attr_map - attr_map.min()
     attr_map_scaled /= attr_map_scaled.max()
     color = turbo_cmap(attr_map_scaled)[:, :3]
-    #print("shape of color: ",color.shape)
-    #np.savetxt("color", color)
 
     vis = open3d.visualization.Visualizer()
     vis.create_window()
@@ -132,21 +140,16 @@ def visualize_attr_map(points, box, attr_map, draw_origin=True):
     pts.points = open3d.utility.Vector3dVector(points[:, :3])
     pts.colors = open3d.utility.Vector3dVector(color)
     color1 = np.asarray(pts.colors)
-    #print((color1))
-    #vis.add_geometry(pts)
     cropped_pcd = pts.crop(bb)
-    open3d.visualization.draw_geometries(cropped_pcd)
+    crop_points = np.array(cropped_pcd.points)
+    print(crop_points.shape)
+    #open3d.visualization.draw_geometries([cropped_pcd])
 
-    vis.run()
-    vis.destroy_window()
+    # vis.run()
+    # vis.destroy_window()
+#先得到一个新的attr
 
-# print(box[0, :])
-# attr_map1 = dele_attr(attr_map[0, :], level=0.7)
-#
-# data= dele_points(pcl, attr_map1)
-# pcl1= data[[1,2,3,4],:]
-# new_map = data[0, :]
-visualize_attr_map(pcl, box[0, :], attr_map)
-#visualize_attr_map(pcl1, box[0, :], new_map)
 
-#point_crop(pcl, box[0, :])
+attr_map1, pt_list = dele_attr(attr_map[0, :], level=0.7)
+new_pcl = new_pointcloud(pcl, pt_list)
+visualize_attr_map(new_pcl, box[0, :], attr_map1)
